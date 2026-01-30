@@ -18,7 +18,7 @@ set -euo pipefail
 
 # Configuration
 CLAWD_HOME="${CLAWD_HOME:-$HOME/clawd}"
-LOGS_DIR="$CLAWD_HOME/memory/logs"
+LOGS_DIR="$CLAWD_HOME/memory"  # Daily session logs are in memory/, not memory/logs/
 LEARNINGS_DIR="$CLAWD_HOME/memory/learnings"
 TEMPLATES_FILE="$CLAWD_HOME/docs/compound-templates.md"
 DAYS_BACK=1
