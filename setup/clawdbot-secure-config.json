@@ -1,0 +1,78 @@
+{
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  },
+  
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "KEEP_YOUR_EXISTING_TOKEN_HERE"
+    },
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  },
+  
+  "agents": {
+    "defaults": {
+      "maxConcurrent": 1,
+      "subagents": {
+        "maxConcurrent": 2
+      },
+      "workspace": "/Users/zacharyhartley/clawd",
+      
+      "sandbox": {
+        "mode": "all",
+        "scope": "session",
+        "workspace": "rw",
+        "docker": {
+          "network": "bridge"
+        }
+      },
+      
+      "models": {
+        "openrouter/google/gemini-2.0-flash-exp:free": {
+          "alias": "Gemini Free"
+        }
+      },
+      "model": {
+        "primary": "openrouter/google/gemini-2.0-flash-exp:free"
+      }
+    }
+  },
+  
+  "tools": {
+    "elevated": {
+      "enabled": false
+    }
+  },
+  
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  
+  "auth": {
+    "profiles": {
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
+      }
+    }
+  },
+  
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "allowFrom": ["8392043810"],
+        "dmPolicy": "allowlist",
+        "groupPolicy": "deny",
+        "requireMention": false
+      }
+    }
+  }
+}
