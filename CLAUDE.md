@@ -21,22 +21,24 @@ Clawd is a two-layer AI system:
 | Agent | Model | Provider | Role |
 |-------|-------|----------|------|
 | **Director** | Claude Sonnet | Anthropic API | Orchestrator, decision-maker, trust scoring |
-| **Architect** | qwen3:32b | Ollama (local) | System designer |
-| **Scout** | qwen3:32b | Ollama (local) | Researcher |
-| **Builder** | qwen3:32b | Ollama (local) | Implementer |
-| **Refactorer** | qwen3:32b | Ollama (local) | Code improver |
-| **Inspector** | qwen3:32b | Ollama (local) | Quality verifier |
-| **Scribe** | qwen3:32b | Ollama (local) | Documentarian |
+| **Architect** | qwen3:32b | Ollama (PC) | System designer |
+| **Scout** | qwen3:32b | Ollama (PC) | Researcher |
+| **Builder** | qwen3:32b | Ollama (PC) | Implementer |
+| **Refactorer** | qwen3:32b | Ollama (PC) | Code improver |
+| **Inspector** | qwen3:32b | Ollama (PC) | Quality verifier |
+| **Scribe** | qwen3:32b | Ollama (PC) | Documentarian |
 
 **Why hybrid?**
 - Director makes decisions (low token usage, affordable via API)
 - Different model provides differentiated perspective to catch team blindspots
-- Workers do heavy lifting locally at zero marginal cost
-- If API fails, Director can fall back to local qwen3:32b
+- Workers do heavy lifting on PC at zero marginal cost
+- If API fails, Director can fall back to qwen3:32b on PC
 
 ### Hardware Status
 
 - **Current**: Mac M2 (limited, can test single agents only)
+  - qwen3:32b deleted from Mac (was consuming 8GB+ RAM, causing memory pressure)
+  - Workers will run on PC only; Mac runs Director via API
 - **Arriving**: PC with RTX 3060 12GB + 32GB RAM (Jan 30-31, 2026)
 
 ## Key Rules
@@ -77,9 +79,9 @@ See `memory/first-task.md` for current task definition.
 # Required for Director (Claude Sonnet API)
 export ANTHROPIC_API_KEY="sk-ant-..."
 
-# Required for workers (Ollama)
-# Ollama must be running with qwen3:32b loaded
-export OLLAMA_URL="http://localhost:11434"  # Or PC IP when hardware arrives
+# Required for workers (Ollama on PC)
+# qwen3:32b removed from Mac - runs on PC only
+export OLLAMA_URL="http://<PC_IP>:11434"  # Set to PC IP when hardware arrives
 
 # Verify connectivity
 curl -s $OLLAMA_URL/api/tags | jq '.models'
@@ -130,8 +132,8 @@ curl -s $OLLAMA_URL/api/tags | jq '.models'
 # Start watchdog (run in separate terminal)
 ./scripts/ollama-watchdog.sh
 
-# Check Ollama health
-curl -s localhost:11434/api/tags | jq '.models'
+# Check Ollama health (on PC)
+curl -s $OLLAMA_URL/api/tags | jq '.models'
 
 # View latest checkpoint
 cat memory/checkpoints/$(ls -t memory/checkpoints/ | head -1)
