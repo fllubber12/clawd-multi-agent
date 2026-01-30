@@ -308,6 +308,51 @@ def call_worker(agent_name: str, prompt: str) -> dict:
 # State Management
 # =============================================================================
 
+# =============================================================================
+# Input Sanitization
+# =============================================================================
+
+SUSPICIOUS_PATTERNS = [
+    r"ignore\s+(previous|all|above)\s+instructions?",
+    r"disregard\s+(previous|all|above)",
+    r"forget\s+(everything|all|previous)",
+    r"you\s+are\s+now\s+a",
+    r"new\s+instructions?:",
+    r"system\s*:\s*",
+    r"<\s*system\s*>",
+    r"IMPORTANT:\s*ignore",
+    r"override\s+instructions?",
+    r"jailbreak",
+    r"DAN\s+mode",
+]
+
+def check_for_injection(content: str) -> list:
+    """Check content for potential prompt injection patterns"""
+    warnings = []
+    content_lower = content.lower()
+
+    for pattern in SUSPICIOUS_PATTERNS:
+        if re.search(pattern, content_lower, re.IGNORECASE):
+            warnings.append(f"Suspicious pattern detected: {pattern}")
+
+    # Check for base64 encoded content (potential hidden instructions)
+    if re.search(r'[A-Za-z0-9+/]{50,}={0,2}', content):
+        warnings.append("Potential base64 encoded content detected")
+
+    return warnings
+
+def sanitize_task(task_content: str) -> tuple[str, list]:
+    """Sanitize task content and return warnings"""
+    warnings = check_for_injection(task_content)
+
+    if warnings:
+        log("WARN", f"Task file security warnings: {warnings}")
+        log_json({"event": "security_warning", "warnings": warnings})
+
+    # Return original content (don't modify, just warn)
+    # Director should be aware of potential issues
+    return task_content, warnings
+
 def init_state(task: str) -> dict:
     """Initialize fresh state for a task"""
     return {
@@ -346,16 +391,72 @@ def load_latest_checkpoint() -> Optional[dict]:
     """Load most recent checkpoint"""
     if not CHECKPOINT_DIR.exists():
         return None
-    
+
     checkpoints = sorted(CHECKPOINT_DIR.glob("chk-*.json"))
     if not checkpoints:
         return None
-    
+
     latest = checkpoints[-1]
     log("INFO", f"Loading checkpoint: {latest.name}")
-    
+
     with open(latest) as f:
         return json.load(f)
+
+def save_session_summary(state: dict):
+    """Save structured session summary for analysis"""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Build session summary
+    session = {
+        "session_id": state.get("task_id"),
+        "task": state.get("task", "")[:500],  # Truncate for readability
+        "start_time": state.get("started_at"),
+        "end_time": datetime.now().isoformat(),
+        "status": state.get("status"),
+        "turns": [],
+        "metrics": {
+            "total_turns": state.get("turn", 0),
+            "workers_used": list(set(h.get("agent") for h in state.get("history", []))),
+            "escalations": 1 if state.get("status") == "escalated" else 0,
+            "errors": sum(1 for h in state.get("history", []) if not h.get("success", True)),
+            "consecutive_failures": state.get("consecutive_failures", 0)
+        }
+    }
+
+    # Add turn-by-turn summary
+    for entry in state.get("history", []):
+        session["turns"].append({
+            "turn": entry.get("turn"),
+            "agent": entry.get("agent"),
+            "success": entry.get("success"),
+            "duration_ms": entry.get("latency_ms", 0),
+            "timestamp": entry.get("timestamp")
+        })
+
+    # Save to file
+    session_file = LOGS_DIR / f"session-{state.get('task_id', 'unknown')}.json"
+    with open(session_file, "w") as f:
+        json.dump(session, f, indent=2, default=str)
+
+    log("INFO", f"Session summary saved: {session_file.name}")
+    return session
+
+# =============================================================================
+# Notifications
+# =============================================================================
+
+def notify(message: str, severity: str = "info"):
+    """Send notification via notify.sh"""
+    notify_script = SCRIPTS_DIR / "notify.sh"
+    if notify_script.exists():
+        try:
+            subprocess.run(
+                [str(notify_script), message, severity],
+                capture_output=True,
+                timeout=30
+            )
+        except Exception as e:
+            log("WARN", f"Notification failed: {e}")
 
 # =============================================================================
 # Alerts & Escalation
@@ -430,9 +531,12 @@ def run_orchestrator(task_file: str = None, resume: bool = False):
             log("ERROR", f"Task file not found: {task_file}")
             return None
         
-        task = task_path.read_text()
+        task_raw = task_path.read_text()
+        task, security_warnings = sanitize_task(task_raw)
         state = init_state(task)
+        state["security_warnings"] = security_warnings
         log("INFO", f"Starting new task: {state['task_id']}")
+        notify(f"Task started: {state['task_id']}", "info")
     
     # Save initial checkpoint
     save_checkpoint(state)
@@ -498,17 +602,20 @@ def run_orchestrator(task_file: str = None, resume: bool = False):
             log("INFO", "Task completed successfully!")
             state["status"] = "complete"
             state["completed_at"] = datetime.now().isoformat()
-        
+            notify(f"Task {state['task_id']} completed in {state['turn']} turns", "info")
+
         elif action == "escalate":
             reason = decision.get("thought", decision.get("reason", "Unknown reason"))
             log("WARN", f"Escalating: {reason}")
             create_alert("Director Escalation", "MEDIUM", reason, state)
             state["status"] = "escalated"
-        
+            notify(f"ESCALATION: {reason[:100]}", "error")
+
         elif action == "halt":
             reason = decision.get("thought", decision.get("reason", "Director requested halt"))
             log("INFO", f"Halting: {reason}")
             state["status"] = "halted"
+            notify(f"Task halted: {reason[:100]}", "warn")
         
         else:
             log("WARN", f"Unknown action: {action}")
@@ -527,9 +634,10 @@ def run_orchestrator(task_file: str = None, resume: bool = False):
         state["status"] = "max_turns"
     
     save_checkpoint(state)
+    save_session_summary(state)
     log("INFO", f"Orchestrator finished. Status: {state['status']}")
     log_json({"event": "orchestrator_end", "status": state["status"], "turns": state["turn"]})
-    
+
     return state
 
 # =============================================================================
