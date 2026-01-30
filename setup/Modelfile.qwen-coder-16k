@@ -1,0 +1,21 @@
+# Modelfile for qwen-coder-16k
+# Creates a 16K context variant of qwen2.5-coder:7b
+#
+# Usage:
+#   ollama create qwen-coder-16k -f Modelfile.qwen-coder-16k
+#
+# Then use with:
+#   ollama run qwen-coder-16k "your prompt"
+
+FROM qwen2.5-coder:7b
+
+# 16K context - good balance for RTX 3060 12GB
+# Uses ~6.2GB total (5GB model + 1.2GB KV cache)
+PARAMETER num_ctx 16384
+
+# Temperature for code generation (lower = more deterministic)
+PARAMETER temperature 0.3
+
+# Stop sequences for cleaner output
+PARAMETER stop "<|endoftext|>"
+PARAMETER stop "<|im_end|>"

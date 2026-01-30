@@ -6,11 +6,11 @@
 #
 # Environment variables:
 #   OLLAMA_URL      - Ollama API URL (default: http://localhost:11434)
-#   OLLAMA_MODEL    - Model to use (default: qwen2.5-coder:7b)
+#   CLAWD_MODEL     - Model to use (default: qwen-coder-16k)
 #   TIMEOUT         - Request timeout in seconds (default: 300)
 #   MAX_RETRIES     - Maximum retry attempts (default: 3)
 #   LOG_DIR         - Log directory (default: ~/clawd/memory/logs)
-#   THINKING_MODE   - Enable thinking mode: true/false (default: true)
+#   THINKING_MODE   - Enable thinking mode: true/false (default: false for 7B models)
 
 set -euo pipefail
 
@@ -19,11 +19,11 @@ set -euo pipefail
 # ============================================================================
 
 OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5-coder:7b}"
+OLLAMA_MODEL="${CLAWD_MODEL:-qwen-coder-16k}"
 TIMEOUT="${TIMEOUT:-300}"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 LOG_DIR="${LOG_DIR:-$HOME/clawd/memory/logs}"
-THINKING_MODE="${THINKING_MODE:-true}"
+THINKING_MODE="${THINKING_MODE:-false}"
 ALERTS_DIR="${ALERTS_DIR:-$HOME/clawd/memory/alerts}"
 
 # Retry configuration
