@@ -120,6 +120,58 @@ ollama run qwen2.5-coder:7b "Write a Python function to merge two sorted lists"
 
 ---
 
+**Ollama Context Window Management** (Critical for Performance):
+
+**Default is too small**: Ollama defaults to 2048-4096 tokens, but agentic tasks need more.
+
+**Setting context length**:
+```bash
+# Temporary (in chat)
+/set parameter num_ctx 16384
+
+# Save as custom model variant
+/save qwen-coder-16k:7b
+
+# Permanent via Modelfile
+cat > Modelfile << EOF
+FROM qwen2.5-coder:7b
+PARAMETER num_ctx 16384
+EOF
+ollama create qwen-coder-16k -f Modelfile
+
+# Or set globally via environment
+export OLLAMA_CONTEXT_LENGTH=16384
+```
+
+**VRAM vs Context tradeoff (RTX 3060 12GB)**:
+
+| Context | KV Cache VRAM | Model VRAM | Total | Fits? |
+|---------|---------------|------------|-------|-------|
+| 4K | ~0.3GB | 5GB | ~5.3GB | ✅ Comfortable |
+| 8K | ~0.6GB | 5GB | ~5.6GB | ✅ Good |
+| 16K | ~1.2GB | 5GB | ~6.2GB | ✅ Recommended |
+| 32K | ~2.4GB | 5GB | ~7.4GB | ⚠️ Tight |
+| 64K | ~4.8GB | 5GB | ~9.8GB | ⚠️ Very tight |
+
+**Recommendation for clawd**: Use 16K context. Balances capability with VRAM headroom.
+
+**Monitor with**:
+```bash
+# Check actual context being used
+ollama ps  # Shows CONTEXT column
+
+# Monitor VRAM in real-time
+watch -n 1 nvidia-smi
+```
+
+**Flash Attention** (free performance boost):
+```bash
+export OLLAMA_FLASH_ATTENTION=1
+```
+Reduces VRAM usage and increases speed with zero quality loss.
+
+---
+
 #### 2. Compound Engineering Pattern
 **Status**: Research complete - ready to implement
 
@@ -588,40 +640,135 @@ Without progressive disclosure, ALL of this would be in context from the start.
 ---
 
 #### 5. qmd for Memory Retrieval
-**Status**: Identified as solution, not yet installed
+**Status**: Research complete - ready to install
 
-**Source**: levineam/qmd-skill GitHub
+**Sources**: 
+- tobi/qmd (original CLI tool)
+- ehc-io/qmd (MCP server version)
+- levineam/qmd-skill (Claude Code skill)
 
-**What it does**: Local markdown search with BM25 + optional vector embeddings
+---
 
-**Why it matters**: As memory/ folder grows, can't load everything. Director needs fast search.
+**What qmd Is**:
 
-**Commands**:
+A local markdown search engine combining:
+- **BM25** (keyword search via SQLite FTS5) - fast, instant
+- **Vector embeddings** (semantic search) - slower, smarter
+- **LLM re-ranking** (hybrid query mode) - highest quality
+
+All running locally via node-llama-cpp with GGUF models.
+
+---
+
+**Two Versions**:
+
+| Version | Installation | Best For |
+|---------|--------------|----------|
+| `tobi/qmd` | `bun install -g https://github.com/tobi/qmd` | CLI usage, cron jobs |
+| `ehc-io/qmd` | Docker + MCP | Claude Code integration |
+
+For clawd, the CLI version (`tobi/qmd`) is simpler and sufficient.
+
+---
+
+**Search Modes**:
+
+| Mode | Command | Speed | Use Case |
+|------|---------|-------|----------|
+| `search` | `qmd search "query"` | Instant | Default - keyword matching |
+| `vsearch` | `qmd vsearch "query"` | ~30-60s first run | Semantic similarity |
+| `query` | `qmd query "query"` | Slow | Hybrid + reranking (best quality) |
+
+**Recommendation from qmd-skill**:
+> "Prefer `qmd search` (BM25). It's typically instant and should be the default. Use `qmd vsearch` only when keyword search fails."
+
+---
+
+**Setup for Clawd**:
+
 ```bash
-# Index memory folder
+# Install (requires Bun)
+curl -fsSL https://bun.sh/install | bash
+bun install -g https://github.com/tobi/qmd
+
+# Create collection for clawd memory
 qmd collection add ~/clawd/memory --name clawd-memory --mask "**/*.md"
 
-# Fast keyword search (BM25)
-qmd search "A Bao A Qu error" -c clawd-memory
+# Add context (helps search quality)
+qmd context add qmd://clawd-memory "Clawd multi-agent system: tasks, checkpoints, logs, learnings"
 
-# Semantic search (slower, needs local embedding model)
-qmd vsearch "link summon combo failures"
+# Generate embeddings (one-time, can take a while)
+qmd embed
 
-# Keep index fresh (cron)
-0 * * * * qmd update  # hourly
+# Test search
+qmd search "A Bao A Qu" -c clawd-memory
 ```
 
-**Caveats**:
-- `qmd vsearch` can take ~1 min (loads Qwen3-1.7B for query expansion)
-- BM25 search (`qmd search`) is fast and usually sufficient
-- Not for code search - use proper code tools for that
+---
 
-**Action items**:
-- [ ] Install qmd on Mac
-- [ ] Index memory/ folder
-- [ ] Test search quality on existing checkpoints
-- [ ] Add to Director's available tools
-- [ ] Set up cron for index updates
+**Cron for Index Updates**:
+
+```bash
+# Add to crontab
+crontab -e
+
+# Hourly BM25 index update (fast)
+0 * * * * export PATH="$HOME/.bun/bin:$PATH" && qmd update
+
+# Optional: nightly embedding refresh (slow)
+0 5 * * * export PATH="$HOME/.bun/bin:$PATH" && qmd embed
+```
+
+---
+
+**Integration with Director**:
+
+Director can use qmd before making decisions:
+
+```bash
+# In call-agent.sh or orchestrator, before spawning Director:
+SEARCH_RESULTS=$(qmd search "$TASK_KEYWORDS" -c clawd-memory 2>/dev/null | head -20)
+
+# Pass to Director as context
+claude -p "Task: $TASK
+
+Relevant history from memory:
+$SEARCH_RESULTS
+
+Make your decision..."
+```
+
+---
+
+**Models Used (auto-downloaded)**:
+
+| Model | Purpose | Size |
+|-------|---------|------|
+| embeddinggemma-300M | Vector embeddings | ~300MB |
+| qwen3-reranker-0.6B | Re-ranking | ~600MB |
+| qmd-query-expansion-1.7B | Query expansion | ~1.7GB |
+
+Cache location: `~/.cache/qmd/models/`
+
+---
+
+**Key Differences from Code Search**:
+
+qmd is for **markdown knowledge bases**, not code:
+- Chunking is content-based (~800 tokens/chunk)
+- Handles "messy" markdown well
+- Not a replacement for grep/ripgrep for code
+
+For code search in clawd, workers should use standard tools (grep, ripgrep, ast-grep).
+
+---
+
+**Action Items**:
+- [ ] Install Bun and qmd on Mac
+- [ ] Create clawd-memory collection
+- [ ] Add cron for hourly updates
+- [ ] Test search quality with existing memory/
+- [ ] Integrate search results into Director context
 
 ---
 
@@ -654,36 +801,232 @@ qmd vsearch "link summon combo failures"
 
 ---
 
-#### 7. Overnight Run Infrastructure
-**Status**: Patterns identified, needs implementation
+#### 7. Overnight Run Infrastructure & Observability
+**Status**: Research complete - implementation ready
 
-**Components needed**:
+**Sources**:
+- n8n AI agent deployment guide
+- OpenTelemetry AI agent observability standards
+- Datadog/Langfuse agent monitoring patterns
+- Azure AI Foundry observability best practices
 
-```bash
-# 1. caffeinate wrapper (prevent Mac sleep)
-caffeinate -i -t 32400 &  # 9 hours
+---
 
-# 2. launchd scheduling (Mac) 
-~/Library/LaunchAgents/com.clawd.compound-review.plist  # 10:30 PM
-~/Library/LaunchAgents/com.clawd.task-execute.plist     # 11:00 PM
+**Core Components**:
 
-# 3. Ollama watchdog (already exists)
-./scripts/ollama-watchdog.sh &
-
-# 4. Failure notification
-# On escalation/halt, send notification (Discord webhook? Pushover?)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ OVERNIGHT RUN INFRASTRUCTURE                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  10:30 PM: Compound Review                                   │
+│  ├── Extract learnings from day's logs                       │
+│  ├── Update agent prompts                                    │
+│  └── Commit changes                                          │
+│                                                              │
+│  11:00 PM: Task Execution                                    │
+│  ├── Load updated prompts (now smarter!)                     │
+│  ├── Pick task from memory/tasks/pending.md                  │
+│  ├── Run orchestrator loop                                   │
+│  │   ├── Director decision                                   │
+│  │   ├── Worker execution                                    │
+│  │   ├── Checkpoint after each turn                          │
+│  │   └── Repeat until complete/halt/escalate                 │
+│  └── Log to memory/logs/                                     │
+│                                                              │
+│  Continuous: Monitoring                                      │
+│  ├── Ollama watchdog (restart if crashed)                    │
+│  ├── Alert on escalation/halt                                │
+│  └── Morning summary notification                            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Rate limit consideration**: 
-- `claude -p` uses Pro subscription
-- May hit rate limits on long overnight runs
-- Mitigation: Add delays between Director calls, or batch worker tasks
+---
 
-**Action items**:
-- [ ] Create launchd plists for scheduling
-- [ ] Add caffeinate to orchestrator wrapper
-- [ ] Implement notification on escalation/halt
-- [ ] Test Pro subscription rate limits with extended run
+**Observability Best Practices for Agents**:
+
+From research, AI agents need more than traditional monitoring:
+
+| Traditional | Agent-Specific |
+|-------------|----------------|
+| Uptime | Decision quality |
+| Latency | Reasoning paths |
+| Error rate | Tool selection accuracy |
+| Resource usage | Context adherence |
+
+**Key metrics to track for clawd**:
+1. **Task completion rate** - Did it finish the task?
+2. **Escalation rate** - How often does it need human help?
+3. **Turn count** - How many Director decisions per task?
+4. **Worker failure rate** - Which workers are unreliable?
+5. **Token usage** - Are prompts staying lean?
+
+---
+
+**Logging Structure**:
+
+```
+memory/logs/
+├── overnight-2026-01-30.log      # Main orchestrator log
+├── compound-review.log           # Compound extraction log
+├── sessions/
+│   └── session-TIMESTAMP.json    # Structured session data
+└── metrics/
+    └── daily-summary-2026-01-30.md  # Aggregated metrics
+```
+
+**Session JSON format** (for replay/analysis):
+```json
+{
+  "session_id": "uuid",
+  "task": "A Bao A Qu debug",
+  "start_time": "2026-01-30T23:00:00Z",
+  "end_time": "2026-01-31T02:30:00Z",
+  "status": "complete|escalate|halt",
+  "turns": [
+    {
+      "turn": 1,
+      "director_decision": {...},
+      "worker": "builder",
+      "worker_output": "...",
+      "duration_ms": 45000
+    }
+  ],
+  "metrics": {
+    "total_turns": 12,
+    "workers_used": ["builder", "inspector"],
+    "escalations": 0,
+    "errors": 1
+  }
+}
+```
+
+---
+
+**Notification System**:
+
+```bash
+# scripts/notify.sh
+#!/bin/bash
+# Send notification on important events
+
+MESSAGE="$1"
+SEVERITY="${2:-info}"  # info, warn, error
+
+# Option 1: macOS notification
+osascript -e "display notification \"$MESSAGE\" with title \"Clawd $SEVERITY\" sound name \"Ping\""
+
+# Option 2: Discord webhook (if configured)
+if [[ -n "$DISCORD_WEBHOOK" ]]; then
+  curl -H "Content-Type: application/json" \
+       -d "{\"content\": \"**[$SEVERITY]** $MESSAGE\"}" \
+       "$DISCORD_WEBHOOK"
+fi
+
+# Option 3: Pushover (for phone notifications)
+if [[ -n "$PUSHOVER_TOKEN" ]]; then
+  curl -s \
+    --form-string "token=$PUSHOVER_TOKEN" \
+    --form-string "user=$PUSHOVER_USER" \
+    --form-string "message=$MESSAGE" \
+    --form-string "title=Clawd $SEVERITY" \
+    https://api.pushover.net/1/messages.json
+fi
+```
+
+**Trigger points**:
+- Task started
+- Task completed successfully
+- Escalation triggered (needs human)
+- Halt triggered (consecutive failures)
+- Morning summary (after overnight run)
+
+---
+
+**Rate Limit Handling**:
+
+`claude -p` uses Pro subscription, which has rate limits.
+
+**Mitigations**:
+1. **Add delays**: Sleep between Director calls
+   ```python
+   # In orchestrator.py
+   time.sleep(10)  # 10 seconds between turns
+   ```
+
+2. **Batch worker tasks**: Group related operations
+
+3. **Exponential backoff**: On rate limit errors
+   ```python
+   def call_director_with_backoff(prompt, max_retries=5):
+       for attempt in range(max_retries):
+           try:
+               return call_director(prompt)
+           except RateLimitError:
+               wait = 2 ** attempt * 60  # 1, 2, 4, 8, 16 minutes
+               log(f"Rate limited, waiting {wait}s")
+               time.sleep(wait)
+       raise Exception("Rate limit exceeded after max retries")
+   ```
+
+4. **Fallback to local model**: Use Ollama for non-critical decisions
+   ```python
+   if rate_limited and not critical_decision:
+       return call_local_model(prompt)
+   ```
+
+---
+
+**Failure Recovery**:
+
+| Failure | Recovery |
+|---------|----------|
+| Ollama crash | Watchdog restarts, orchestrator continues from checkpoint |
+| Mac sleep | caffeinate prevents sleep; if happened, resume from checkpoint |
+| Rate limit | Exponential backoff, then halt with alert |
+| Worker infinite loop | Timeout after 5 minutes, kill and retry once |
+| Orchestrator crash | launchd restart, resume from checkpoint |
+
+---
+
+**Morning Summary Script**:
+
+```bash
+# scripts/morning-summary.sh
+#!/bin/bash
+# Generate and send morning summary of overnight run
+
+LOGFILE="$HOME/clawd/memory/logs/overnight-$(date +%Y-%m-%d).log"
+
+if [[ -f "$LOGFILE" ]]; then
+  # Extract key metrics
+  COMPLETED=$(grep -c "Task complete" "$LOGFILE" || echo 0)
+  ESCALATED=$(grep -c "ESCALATE" "$LOGFILE" || echo 0)
+  ERRORS=$(grep -c "ERROR" "$LOGFILE" || echo 0)
+  
+  SUMMARY="Overnight Run Summary:
+- Tasks completed: $COMPLETED
+- Escalations: $ESCALATED  
+- Errors: $ERRORS
+
+Check full log: $LOGFILE"
+
+  ./scripts/notify.sh "$SUMMARY" "info"
+else
+  ./scripts/notify.sh "No overnight log found - run may not have started" "warn"
+fi
+```
+
+---
+
+**Action Items**:
+- [x] Create launchd plists ✅ (in artifacts)
+- [ ] Add structured session logging to orchestrator
+- [ ] Create notify.sh with Discord/Pushover support
+- [ ] Add morning-summary.sh
+- [ ] Add rate limit handling to orchestrator
+- [ ] Test full overnight run cycle
 
 ---
 
@@ -778,32 +1121,48 @@ Current clawd uses free-form task .md files. Could formalize later if needed.
 | "Equipping agents for the real world with Agent Skills" | Anthropic Eng | Skills as onboarding guides, three-tier loading |
 | "Claude Agent Skills: A First Principles Deep Dive" | Lee Han Chung | Skills are prompt injection, not code execution |
 | "claude-code-showcase" | Chris Wiles | Practical skills structure, hooks, agent patterns |
+| "Context length - Ollama Docs" | Ollama | Default 4096 too small for agents, set to 64K+ |
+| "Ollama VRAM Requirements 2026" | LocalLLM.in | Q4_K_M sweet spot, Flash Attention free boost |
+| "Speed Up Local LLMs by Tuning Context" | Windows Forum | Context vs VRAM tradeoff, 100% GPU critical |
+| "tobi/qmd" | Tobi | BM25 + vector + reranking, all local |
+| "15 best practices for AI agents" | n8n Blog | Escalation tracking, human-in-loop triggers |
+| "AI Agent Monitoring" | UptimeRobot | System health + agent behavior = full visibility |
+| "AI Agent Observability" | OpenTelemetry | Standardized metrics, traces, logs for agents |
+| "Monitor AI agents" | Datadog | Non-linear execution graphs, decision tracing |
 
 ---
 
 ## Next Actions (Prioritized)
 
 ### When PC arrives:
-1. [x] ~~Research model selection~~ ✅ COMPLETE - see above
-2. [ ] Set up Ollama on PC
-3. [ ] Pull recommended models: `qwen2.5-coder:7b`, `deepseek-r1:7b`
-4. [ ] Test VRAM usage with `nvidia-smi` 
-5. [ ] Benchmark speed on sample coding tasks
-6. [ ] Run first real task (A Bao A Qu Link Summon debug)
+1. [x] ~~Research model selection~~ ✅ COMPLETE
+2. [x] ~~Research Ollama context management~~ ✅ COMPLETE
+3. [ ] Set up Ollama on PC
+4. [ ] Create custom model with 16K context: `qwen-coder-16k:7b`
+5. [ ] Pull recommended models: `qwen2.5-coder:7b`, `deepseek-r1:7b`
+6. [ ] Enable Flash Attention: `export OLLAMA_FLASH_ATTENTION=1`
+7. [ ] Test VRAM usage with `nvidia-smi` 
+8. [ ] Benchmark speed on sample coding tasks
+9. [ ] Run first real task (A Bao A Qu Link Summon debug)
 
 ### Before first overnight run:
-7. [x] ~~Research Compound Engineering pattern~~ ✅ COMPLETE - implementation plan ready
-8. [x] ~~Research Skills architecture~~ ✅ COMPLETE - refactoring plan ready
-9. [ ] Implement compound review script (`scripts/compound-review.sh`)
-10. [ ] Create compound templates (`docs/compound-templates.md`)
-11. [ ] Set up launchd scheduling + caffeinate
-12. [ ] Audit and refactor agent .md files (separate Skills from prompts)
-13. [ ] Add basic input sanitization to orchestrator
+10. [x] ~~Research Compound Engineering pattern~~ ✅ COMPLETE
+11. [x] ~~Research Skills architecture~~ ✅ COMPLETE
+12. [x] ~~Research qmd for memory search~~ ✅ COMPLETE
+13. [x] ~~Research overnight observability~~ ✅ COMPLETE
+14. [x] ~~Create compound-review.sh~~ ✅ COMPLETE (in artifacts)
+15. [x] ~~Create compound templates~~ ✅ COMPLETE (in artifacts)
+16. [x] ~~Create launchd plists~~ ✅ COMPLETE (in artifacts)
+17. [ ] Audit and refactor agent .md files (separate Skills from prompts)
+18. [ ] Add basic input sanitization to orchestrator
+19. [ ] Add structured session logging to orchestrator
+20. [ ] Create notify.sh for escalation alerts
 
 ### Quality of life:
-14. [ ] Install qmd, index memory/ folder
-15. [ ] Add notification on escalation/halt
-16. [ ] Document threat model
+21. [ ] Install Bun and qmd, index memory/ folder
+22. [ ] Add cron for qmd index updates
+23. [ ] Create morning-summary.sh
+24. [ ] Document threat model in repo
 
 ---
 
