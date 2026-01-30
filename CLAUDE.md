@@ -21,18 +21,23 @@ Clawd is a two-layer AI system:
 | Agent | Model | Provider | Role |
 |-------|-------|----------|------|
 | **Director** | Claude Sonnet | Anthropic API | Orchestrator, decision-maker, trust scoring |
-| **Architect** | qwen3:32b | Ollama (PC) | System designer |
-| **Scout** | qwen3:32b | Ollama (PC) | Researcher |
-| **Builder** | qwen3:32b | Ollama (PC) | Implementer |
-| **Refactorer** | qwen3:32b | Ollama (PC) | Code improver |
-| **Inspector** | qwen3:32b | Ollama (PC) | Quality verifier |
-| **Scribe** | qwen3:32b | Ollama (PC) | Documentarian |
+| **Architect** | qwen2.5-coder:7b | Ollama (PC) | System designer |
+| **Scout** | qwen2.5-coder:7b | Ollama (PC) | Researcher |
+| **Builder** | qwen2.5-coder:7b | Ollama (PC) | Implementer |
+| **Refactorer** | qwen2.5-coder:7b | Ollama (PC) | Code improver |
+| **Inspector** | qwen2.5-coder:7b | Ollama (PC) | Quality verifier |
+| **Scribe** | qwen2.5:7b | Ollama (PC) | Documentarian |
 
-**Why hybrid?**
+**Why qwen2.5-coder:7b?** (see docs/clawd-research-hub.md)
+- Fits comfortably in 12GB VRAM (~5-6GB at Q4)
+- 25-37 tokens/sec on RTX 3060 (fast)
+- qwen3:32b won't fit (needs ~19GB), 14b would be tight and slow
+
+**Why hybrid architecture?**
 - Director makes decisions (low token usage, affordable via API)
 - Different model provides differentiated perspective to catch team blindspots
 - Workers do heavy lifting on PC at zero marginal cost
-- If API fails, Director can fall back to qwen3:32b on PC
+- If API fails, Director can fall back to qwen2.5-coder:7b on PC
 
 ### Hardware Status
 
@@ -80,8 +85,12 @@ See `memory/first-task.md` for current task definition.
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Required for workers (Ollama on PC)
-# qwen3:32b removed from Mac - runs on PC only
 export OLLAMA_URL="http://<PC_IP>:11434"  # Set to PC IP when hardware arrives
+export OLLAMA_MODEL="qwen2.5-coder:7b"    # Default worker model
+
+# Pull models on PC (first time)
+ollama pull qwen2.5-coder:7b   # For Builder, Refactorer, etc.
+ollama pull qwen2.5:7b         # For Scribe (general, not code-specific)
 
 # Verify connectivity
 curl -s $OLLAMA_URL/api/tags | jq '.models'
@@ -96,38 +105,50 @@ curl -s $OLLAMA_URL/api/tags | jq '.models'
 ├── IDENTITY.md         # Layer 1 AI identity
 ├── USER.md             # Human context
 ├── MEMORY.md           # Long-term curated memories
-├── agents/             # Agent definitions
+├── agents/             # Agent definitions (lean prompts)
 │   ├── README.md       # Decision framework
-│   ├── director.md
-│   ├── architect.md
-│   ├── scout.md
-│   ├── builder.md
-│   ├── refactorer.md
-│   ├── inspector.md
-│   └── scribe.md
+│   ├── director.md     # Full prompt (orchestrator interface)
+│   └── *.md            # Lean prompts → point to skills/
+├── skills/             # Progressive disclosure workflows
+│   ├── implementing/   # Building new code
+│   ├── debugging/      # Fixing bugs
+│   ├── refactoring/    # Improving code
+│   ├── testing/        # Writing tests
+│   └── documenting/    # Writing docs
 ├── memory/             # Runtime state
-│   ├── YYYY-MM-DD.md   # Daily logs
-│   ├── requirements.md
-│   ├── decisions-log.md
-│   ├── blockers.md
-│   ├── technical-debt.md
-│   ├── first-task.md
+│   ├── learnings/      # Compound engineering extractions
 │   ├── checkpoints/
 │   ├── alerts/
 │   └── logs/
 ├── scripts/
-│   ├── call-agent.sh
-│   └── ollama-watchdog.sh
+│   ├── orchestrator.py     # Core orchestration loop
+│   ├── call-agent.sh       # Worker invocation
+│   ├── compound-review.sh  # Nightly learning extraction
+│   └── ollama-watchdog.sh  # Ollama stability monitor
+├── launchd/            # macOS scheduled jobs
+│   ├── com.clawd.compound-review.plist   # 10:30 PM
+│   └── com.clawd.overnight-run.plist     # 11:00 PM
 ├── workspace/          # Cloned repos for tasks
 └── docs/
+    ├── clawd-research-hub.md     # Model selection, patterns
+    ├── compound-templates.md     # Learning templates
     └── pre-flight-checklist.md
 ```
 
 ## Quick Commands
 
 ```bash
+# Run a task through orchestrator
+python3 scripts/orchestrator.py memory/first-task.md
+
+# Resume from checkpoint
+python3 scripts/orchestrator.py --resume
+
 # Call an agent directly
 ./scripts/call-agent.sh builder "Implement the factorial function"
+
+# Run compound review (extract learnings)
+./scripts/compound-review.sh --days 1
 
 # Start watchdog (run in separate terminal)
 ./scripts/ollama-watchdog.sh

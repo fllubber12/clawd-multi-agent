@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.clawd.compound-review.plist
+  
+  Scheduled compound review for clawd's learning extraction.
+  Runs nightly at 10:30 PM to extract learnings before overnight task execution.
+  
+  Installation:
+    cp com.clawd.compound-review.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.clawd.compound-review.plist
+  
+  Manual trigger:
+    launchctl start com.clawd.compound-review
+  
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.clawd.compound-review.plist
+    rm ~/Library/LaunchAgents/com.clawd.compound-review.plist
+-->
+<plist version="1.0">
+<dict>
+    <!-- Unique identifier -->
+    <key>Label</key>
+    <string>com.clawd.compound-review</string>
+    
+    <!-- Command to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Use caffeinate to prevent sleep during execution -->
+        <string>/usr/bin/caffeinate</string>
+        <string>-i</string>
+        <string>-t</string>
+        <string>3600</string><!-- 1 hour timeout -->
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <!-- 
+          The actual command:
+          - cd to clawd directory
+          - run compound review
+          - log output
+        -->
+        <string>cd ~/clawd &amp;&amp; ./scripts/compound-review.sh --days 1 >> ~/clawd/memory/logs/compound-review.log 2>&amp;1</string>
+    </array>
+    
+    <!-- Schedule: Run at 10:30 PM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>22</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>~/clawd</string>
+    
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAWD_HOME</key>
+        <string>~/clawd</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>~/clawd/memory/logs/compound-launchd.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>~/clawd/memory/logs/compound-launchd.stderr.log</string>
+    
+    <!-- Run even if missed (e.g., computer was asleep) -->
+    <key>StartInterval</key>
+    <integer>0</integer>
+    
+    <!-- Don't retry on failure -->
+    <key>KeepAlive</key>
+    <false/>
+    
+    <!-- Nice value (lower priority) -->
+    <key>Nice</key>
+    <integer>10</integer>
+    
+    <!-- Timeout: kill if running longer than 2 hours -->
+    <key>TimeOut</key>
+    <integer>7200</integer>
+</dict>
+</plist>

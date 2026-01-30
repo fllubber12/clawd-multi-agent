@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.clawd.overnight-run.plist
+  
+  Scheduled overnight autonomous coding session for clawd.
+  Runs at 11:00 PM, after compound review (10:30 PM) completes.
+  
+  The 30-minute gap ensures:
+  1. Compound review has finished extracting learnings
+  2. Agent prompts are updated with fresh patterns
+  3. New task execution benefits from compounded knowledge
+  
+  Installation:
+    cp com.clawd.overnight-run.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.clawd.overnight-run.plist
+  
+  Manual trigger:
+    launchctl start com.clawd.overnight-run
+  
+  Check status:
+    launchctl list | grep clawd
+-->
+<plist version="1.0">
+<dict>
+    <!-- Unique identifier -->
+    <key>Label</key>
+    <string>com.clawd.overnight-run</string>
+    
+    <!-- Command to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Use caffeinate to prevent sleep during long operations -->
+        <string>/usr/bin/caffeinate</string>
+        <string>-i</string>
+        <string>-t</string>
+        <string>28800</string><!-- 8 hour timeout -->
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <!-- 
+          The actual command:
+          - cd to clawd directory
+          - Check if there's a pending task or resume from checkpoint
+          - Run orchestrator
+          - Log output with timestamp
+        -->
+        <string>
+cd ~/clawd
+
+LOGFILE="memory/logs/overnight-$(date +%Y-%m-%d).log"
+echo "=== Overnight run started: $(date) ===" >> "$LOGFILE"
+
+# Check for pending task file or resume
+if [[ -f "memory/tasks/pending.md" ]]; then
+    echo "Found pending task, executing..." >> "$LOGFILE"
+    python3 scripts/orchestrator.py memory/tasks/pending.md >> "$LOGFILE" 2>&amp;1
+elif [[ -f "memory/checkpoints/latest.json" ]]; then
+    echo "No pending task, attempting resume from checkpoint..." >> "$LOGFILE"
+    python3 scripts/orchestrator.py --resume >> "$LOGFILE" 2>&amp;1
+else
+    echo "No pending task and no checkpoint to resume. Nothing to do." >> "$LOGFILE"
+fi
+
+echo "=== Overnight run finished: $(date) ===" >> "$LOGFILE"
+
+# Send notification if there are alerts
+if [[ -n "$(ls -A memory/alerts/ 2>/dev/null)" ]]; then
+    # macOS notification
+    osascript -e 'display notification "Check memory/alerts/ for details" with title "Clawd Alert" sound name "Ping"'
+fi
+        </string>
+    </array>
+    
+    <!-- Schedule: Run at 11:00 PM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>23</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>~/clawd</string>
+    
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAWD_HOME</key>
+        <string>~/clawd</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <!-- Add Ollama to path if installed via homebrew -->
+        <key>OLLAMA_HOST</key>
+        <string>http://localhost:11434</string>
+    </dict>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>~/clawd/memory/logs/overnight-launchd.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>~/clawd/memory/logs/overnight-launchd.stderr.log</string>
+    
+    <!-- Don't restart on failure -->
+    <key>KeepAlive</key>
+    <false/>
+    
+    <!-- Nice value (lower priority, don't hog CPU) -->
+    <key>Nice</key>
+    <integer>10</integer>
+    
+    <!-- Timeout: kill if running longer than 8 hours -->
+    <key>TimeOut</key>
+    <integer>28800</integer>
+</dict>
+</plist>

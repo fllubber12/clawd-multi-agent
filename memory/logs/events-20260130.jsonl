@@ -1,0 +1,12 @@
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114014-20260130-114014.json", "timestamp": "2026-01-30T11:40:14.293301"}
+{"event": "director_call", "turn": 1, "timestamp": "2026-01-30T11:40:14.293519"}
+{"event": "director_error", "error": "ANTHROPIC_API_KEY not set", "timestamp": "2026-01-30T11:40:14.293627"}
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114014-20260130-114014.json", "timestamp": "2026-01-30T11:40:14.294030"}
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114014-20260130-114015.json", "timestamp": "2026-01-30T11:40:15.301376"}
+{"event": "orchestrator_end", "status": "halted", "turns": 1, "timestamp": "2026-01-30T11:40:15.301878"}
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114106-20260130-114106.json", "timestamp": "2026-01-30T11:41:06.403933"}
+{"event": "director_call", "turn": 1, "timestamp": "2026-01-30T11:41:06.404205"}
+{"event": "director_error", "error": "ANTHROPIC_API_KEY not set", "timestamp": "2026-01-30T11:41:06.404307"}
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114106-20260130-114106.json", "timestamp": "2026-01-30T11:41:06.404695"}
+{"event": "checkpoint", "file": "/Users/zacharyhartley/clawd/memory/checkpoints/chk-task-20260130-114106-20260130-114107.json", "timestamp": "2026-01-30T11:41:07.411713"}
+{"event": "orchestrator_end", "status": "halted", "turns": 1, "timestamp": "2026-01-30T11:41:07.412092"}
