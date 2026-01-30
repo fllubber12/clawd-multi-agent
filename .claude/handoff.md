@@ -1,14 +1,14 @@
 # Clawd Handoff Summary
 
 **Date**: January 30, 2026
-**Session**: Full system prep before PC hardware arrival
+**Session**: Full system prep + Clawdbot security hardening
 
 ---
 
 ## What Clawd Is
 
 A two-layer AI system:
-- **Layer 1**: Personal AI assistant (Discord, email, calendar)
+- **Layer 1**: Personal AI assistant via Clawdbot (Telegram @zachs_molty_bot)
 - **Layer 2**: 7-agent autonomous coding taskforce for overnight runs
 
 **Architecture**: Director (Claude API) orchestrates 6 local workers (Ollama on PC).
@@ -25,13 +25,16 @@ All Mac-side prep is complete. Waiting for PC hardware (RTX 3060 12GB + 32GB RAM
 |-----------|--------|----------|
 | Orchestrator | ✅ Complete | `scripts/orchestrator.py` |
 | Agent prompts (lean) | ✅ Complete | `agents/*.md` |
-| Skills (progressive disclosure) | ✅ Complete | `skills/*/SKILL.md` |
+| Skills (6 total) | ✅ Complete | `skills/*/SKILL.md` |
 | Compound review | ✅ Complete | `scripts/compound-review.sh` |
 | Notifications | ✅ Complete | `scripts/notify.sh` |
 | Morning summary | ✅ Complete | `scripts/morning-summary.sh` |
 | PC setup script | ✅ Complete | `setup/pc-first-boot-setup.sh` |
 | qmd (memory search) | ✅ Installed | `clawd-memory` collection indexed |
+| qmd skill wrapper | ✅ Complete | `skills/qmd/SKILL.md` |
 | launchd plists | ✅ Ready | `launchd/*.plist` |
+| Clawdbot security | ✅ Complete | `setup/clawdbot-secure-*` |
+| Docker sandbox | ✅ Built | `clawdbot-sandbox:bookworm-slim` |
 
 ### Key Decisions Made
 
@@ -46,6 +49,28 @@ All Mac-side prep is complete. Waiting for PC hardware (RTX 3060 12GB + 32GB RAM
 
 **Old**: qwen3:32b (won't fit 12GB VRAM)
 **New**: qwen2.5-coder:7b with 16K context variant (`qwen-coder-16k`)
+
+---
+
+## Clawdbot (Layer 1) Status
+
+Personal AI assistant running on Mac via Telegram.
+
+| Setting | Value |
+|---------|-------|
+| Bot | @zachs_molty_bot |
+| Model | `anthropic/claude-haiku-4.5` (was Gemini Free) |
+| Sandbox | `mode: all` (everything in Docker) |
+| Elevated tools | Disabled |
+| Telegram | Allowlist only (user 8392043810) |
+| Groups | Denied |
+
+**Security hardened:**
+- Built `clawdbot-sandbox:bookworm-slim` Docker image
+- Sandbox isolates all exec in containers
+- No host escape possible (elevated disabled)
+
+**Restart command:** `clawdbot gateway restart`
 
 ---
 
@@ -64,11 +89,19 @@ All Mac-side prep is complete. Waiting for PC hardware (RTX 3060 12GB + 32GB RAM
 ├── setup/
 │   ├── pc-first-boot-setup.sh   # Run this on PC first
 │   ├── clawd-env.sh             # Environment to source
-│   └── Modelfile.qwen-coder-16k # 16K context model definition
+│   ├── Modelfile.qwen-coder-16k # 16K context model definition
+│   ├── clawdbot-secure-config.json      # Hardened clawdbot config
+│   └── clawdbot-secure-setup-instructions.md
 ├── agents/
 │   ├── director.md              # Full prompt with decision format
 │   └── *.md                     # Lean worker prompts
 ├── skills/                      # Progressive disclosure workflows
+│   ├── qmd/SKILL.md             # Memory search skill
+│   ├── debugging/SKILL.md
+│   ├── documenting/SKILL.md
+│   ├── implementing/SKILL.md
+│   ├── refactoring/SKILL.md
+│   └── testing/SKILL.md
 └── memory/
     ├── smoke-test-task.md       # Trivial first test
     └── first-task.md            # A Bao A Qu debug task
@@ -133,13 +166,12 @@ export CLAWD_HOME="$HOME/clawd"
 ## Recent Git History
 
 ```
+ef92ecf feat(skills): add qmd markdown search skill for clawd-memory collection
+5313308 Add clawdbot security config and setup instructions
+851aa5a docs: Add handoff summary for PC hardware arrival
 ba24f5c Add PC setup scripts, update call-agent.sh for qwen-coder-16k
 98cf81c Add notifications, session logging, and input sanitization
 7fdf5a0 docs: Update research hub with Ollama context, qmd, observability
-8e73cce fix: compound-review.sh looks in memory/ not memory/logs/
-220ea2b Integrate compound engineering and skills architecture
-062343f Add orchestration layer and smoke test
-35dfd7b Remove qwen3:32b from Mac, update docs for PC-only Ollama
 ```
 
 ---
@@ -173,4 +205,4 @@ python3 scripts/orchestrator.py --resume
 
 ---
 
-*Handoff created: 2026-01-30*
+*Handoff updated: 2026-01-30 (added Clawdbot security, qmd skill)*
