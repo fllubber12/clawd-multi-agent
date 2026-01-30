@@ -1,0 +1,81 @@
+{
+  "checkpoint_id": "chk-20260130-153000-001",
+  "timestamp": "2026-01-30T15:30:00Z",
+  "task_id": "abaoaqu-debug-001",
+  "phase": "execution",
+  "phase_progress": "step_3_of_5",
+  
+  "agents_state": {
+    "director": {
+      "status": "active",
+      "current_action": "coordinating",
+      "last_decision": "D003"
+    },
+    "architect": {
+      "status": "idle",
+      "last_contribution": "design_review"
+    },
+    "scout": {
+      "status": "idle",
+      "last_contribution": "research_complete"
+    },
+    "builder": {
+      "status": "working",
+      "current_action": "implementing_fix",
+      "current_file": "src/link_summon.py",
+      "progress": "60%"
+    },
+    "refactorer": {
+      "status": "waiting",
+      "waiting_for": "builder_completion"
+    },
+    "inspector": {
+      "status": "idle",
+      "last_test_run": "2026-01-30T15:25:00Z",
+      "tests_passing": true
+    },
+    "scribe": {
+      "status": "active",
+      "current_action": "logging"
+    }
+  },
+  
+  "files_modified": [
+    "src/link_summon.py",
+    "src/priority.py"
+  ],
+  
+  "files_created": [
+    "tests/test_abaoaqu.py"
+  ],
+  
+  "decisions_made": 3,
+  "last_decision_id": "D003",
+  
+  "test_status": {
+    "total": 45,
+    "passing": 45,
+    "failing": 0,
+    "skipped": 2
+  },
+  
+  "context_usage": {
+    "director": "45%",
+    "builder": "62%"
+  },
+  
+  "blockers": [],
+  
+  "alerts_raised": 0,
+  
+  "resume_instructions": {
+    "next_agent": "builder",
+    "next_action": "complete implementation of priority fix",
+    "context_needed": [
+      "memory/decisions-log.md",
+      "memory/requirements.md"
+    ]
+  },
+  
+  "notes": "Builder is implementing priority fix for A Bao A Qu. Inspector verified current tests still pass. On track for completion within estimate."
+}
