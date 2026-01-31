@@ -178,7 +178,60 @@ def extract_error_context(payload: dict) -> dict:
     return context
 
 
-def format_molty_message(context: dict) -> str:
+# Auto-fixable error types per triage skill
+AUTO_FIXABLE_ERRORS = {
+    "ImportError": "Add missing import",
+    "ModuleNotFoundError": "Add missing import",
+    "NameError": "Add import or fix typo",
+    "TypeError": "Add null check",
+    "AttributeError": "Add null check or fix typo",
+    "KeyError": "Use .get() with default",
+    "IndexError": "Add bounds check",
+    "FileNotFoundError": "Add existence check",
+    "SyntaxError": "Fix syntax",
+    "IndentationError": "Fix indentation",
+}
+
+# Errors that should NOT be auto-fixed
+ESCALATE_PATTERNS = [
+    "authentication", "permission", "denied", "forbidden",
+    "timeout", "connection", "network", "ssl", "certificate",
+    "memory", "overflow", "recursion",
+    "database", "integrity", "constraint", "duplicate",
+]
+
+
+def triage_error(context: dict) -> dict:
+    """Determine if error is auto-fixable or needs escalation."""
+    error_type = context.get("error_type", "")
+    error_msg = (context.get("error_message") or "").lower()
+
+    # Check for escalation patterns first
+    for pattern in ESCALATE_PATTERNS:
+        if pattern in error_msg:
+            return {
+                "action": "escalate",
+                "reason": f"Contains '{pattern}' - needs human review",
+                "fix_suggestion": None,
+            }
+
+    # Check if auto-fixable
+    if error_type in AUTO_FIXABLE_ERRORS:
+        return {
+            "action": "auto-fix",
+            "reason": f"{error_type} is auto-fixable",
+            "fix_suggestion": AUTO_FIXABLE_ERRORS[error_type],
+        }
+
+    # Default: escalate unknown errors
+    return {
+        "action": "escalate",
+        "reason": f"Unknown error type: {error_type}",
+        "fix_suggestion": None,
+    }
+
+
+def format_molty_message(context: dict, triage: dict) -> str:
     """Format error context for Molty notification."""
     project = context["project"]
     error_type = context["error_type"] or "Error"
@@ -194,7 +247,15 @@ def format_molty_message(context: dict) -> str:
     if len(error_msg) > 100:
         error_msg = error_msg[:97] + "..."
 
-    return f"🚨 Sentry: {error_type}: {error_msg}{file_info} [{project}]"
+    # Add triage indicator
+    if triage["action"] == "auto-fix":
+        prefix = "🔧"  # Wrench = auto-fixable
+        suffix = f" | Fix: {triage['fix_suggestion']}"
+    else:
+        prefix = "⚠️"  # Warning = needs escalation
+        suffix = ""
+
+    return f"{prefix} Sentry: {error_type}: {error_msg}{file_info} [{project}]{suffix}"
 
 
 def format_triage_context(context: dict) -> str:
@@ -292,16 +353,24 @@ class SentryWebhookHandler(BaseHTTPRequestHandler):
             # Extract error context
             context = extract_error_context(payload)
 
-            # Log the webhook
+            # Triage the error
+            triage = triage_error(context)
+            context["triage"] = triage
+
+            # Log the webhook (includes triage decision)
             log_webhook(context, payload)
 
             # Format and send notification
-            message = format_molty_message(context)
+            message = format_molty_message(context, triage)
             notify_molty(message, context)
 
-            # Also print triage context
-            triage = format_triage_context(context)
-            print(f"\n[TRIAGE CONTEXT]\n{triage}\n")
+            # Print triage decision
+            triage_context = format_triage_context(context)
+            action_str = f"[{triage['action'].upper()}] {triage['reason']}"
+            if triage['fix_suggestion']:
+                action_str += f" → {triage['fix_suggestion']}"
+            print(f"\n[TRIAGE] {action_str}")
+            print(f"\n[CONTEXT]\n{triage_context}\n")
 
             # Send success response
             self.send_response(200)
