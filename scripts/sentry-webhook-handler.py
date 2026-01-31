@@ -41,6 +41,49 @@ PROJECT_PATHS = {
 }
 
 
+def project_from_path(filepath: str) -> str:
+    """Extract project key from file path."""
+    if not filepath:
+        return None
+    if "Polymarket_CopyTrader" in filepath:
+        return "polymarket"
+    if "Desktop/testing" in filepath:
+        return "ygo"
+    if "Desktop/budget" in filepath:
+        return "budget"
+    if "Kalshi_Arbitrage" in filepath:
+        return "kalshi"
+    if "/clawd/" in filepath or "/clawd" in filepath:
+        return "clawd"
+    return None
+
+
+def project_from_url(url: str) -> str:
+    """Extract project slug from Sentry URL."""
+    if not url:
+        return None
+    # Pattern: /projects/org/PROJECT/ or /org/PROJECT/
+    import re
+    match = re.search(r'/projects/[^/]+/([^/]+)/', url)
+    if match:
+        slug = match.group(1)
+        # Map Sentry slugs to our project keys
+        slug_map = {
+            "polymarket-copytrader": "polymarket",
+            "polymarket": "polymarket",
+            "python": "polymarket",  # Generic python project
+            "ygo-combo-pipeline": "ygo",
+            "ygo": "ygo",
+            "budget-pipeline": "budget",
+            "budget": "budget",
+            "kalshi-arbitrage": "kalshi",
+            "kalshi": "kalshi",
+            "clawd": "clawd",
+        }
+        return slug_map.get(slug)
+    return None
+
+
 def extract_error_context(payload: dict) -> dict:
     """Extract relevant error context from Sentry webhook payload."""
     context = {
@@ -61,13 +104,35 @@ def extract_error_context(payload: dict) -> dict:
     data = payload.get("data", payload)
     event = data.get("event", data)
 
-    # Project info
-    context["project"] = (
+    # Project info - try multiple sources
+    project = None
+
+    # 1. Try explicit project_slug
+    project = (
         payload.get("project_slug") or
         payload.get("project", {}).get("slug") or
-        data.get("project", {}).get("slug") or
-        "unknown"
+        data.get("project", {}).get("slug")
     )
+
+    # 2. Try extracting from URL
+    if not project or project == "unknown":
+        url = event.get("url", "")
+        project = project_from_url(url)
+
+    # 3. Try extracting from stacktrace abs_path
+    if not project:
+        exception = event.get("exception", {})
+        values = exception.get("values", [])
+        if values:
+            stacktrace = values[0].get("stacktrace", {})
+            frames = stacktrace.get("frames", [])
+            for frame in reversed(frames):
+                abs_path = frame.get("abs_path", "")
+                project = project_from_path(abs_path)
+                if project:
+                    break
+
+    context["project"] = project or "unknown"
 
     # Error info
     context["level"] = event.get("level", "error")
