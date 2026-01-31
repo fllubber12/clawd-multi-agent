@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.clawd.sentry-webhook</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/zacharyhartley/clawd/.venv/bin/python</string>
+        <string>/Users/zacharyhartley/clawd/scripts/sentry-webhook-handler.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/zacharyhartley/clawd</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/zacharyhartley/clawd/logs/sentry-webhook.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/zacharyhartley/clawd/logs/sentry-webhook.error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>CLAWD_HOME</key>
+        <string>/Users/zacharyhartley/clawd</string>
+    </dict>
+</dict>
+</plist>
