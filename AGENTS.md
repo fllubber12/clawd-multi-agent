@@ -104,25 +104,50 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 ## Tools
 
-Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
+Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`. For markdown search, use `qmd` (see `skills/qmd/SKILL.md`).
+
+## 📂 Project Routing
+
+Route tasks, errors, and queries to the correct repository:
+
+| Key | Name | Path | Keywords |
+|-----|------|------|----------|
+| `polymarket` | Polymarket CopyTrader | ~/Projects/Polymarket_CopyTrader | polymarket, trader, signal, fade |
+| `ygo` | YGO Combo Pipeline | ~/Desktop/testing | ygo, yugioh, combo, deck, card |
+| `budget` | Budget Pipeline | ~/Desktop/budget | budget, transaction, spending |
+| `kalshi` | Kalshi Arbitrage | ~/Projects/Kalshi_Arbitrage | kalshi, arbitrage, spread |
+| `clawd` | clawd | ~/clawd | clawd, agent, orchestrator |
+
+**Brain integration**: For cross-project status, read `~/Brain/overview.md`. For project-specific context, read `~/Brain/projects/<project>.md`.
 
 ## 🚨 Sentry Error Handling
 
-All 5 projects report errors to Sentry, which forwards to you via webhook:
+All 5 projects report errors to Sentry → webhook → you.
 
-| Project | Path | Sentry DSN Suffix |
-|---------|------|-------------------|
-| polymarket | ~/Projects/Polymarket_CopyTrader | /4510801933762560 |
-| ygo | ~/Desktop/testing | /111 |
-| budget | ~/Desktop/budget | /222 |
-| kalshi | ~/Projects/Kalshi_Arbitrage | /333 |
-| clawd | ~/clawd | /444 |
+### Error Classification (decide immediately, no lookup needed)
+
+**✅ Auto-Fix** (proceed without human approval):
+| Error Type | Fix |
+|------------|-----|
+| ImportError, ModuleNotFoundError, NameError | Add missing import |
+| TypeError ("NoneType has no attribute") | Add null check |
+| AttributeError | Add null check or fix typo |
+| KeyError | Use `.get()` with default |
+| IndexError | Add bounds check |
+| SyntaxError, IndentationError | Fix syntax |
+
+**⚠️ Escalate** (notify human):
+- Security/auth failures
+- Database/state corruption
+- Business logic errors
+- Network/external service issues
+- Unknown or unclear cause
 
 ### When You Receive a Sentry Alert
 
 1. **Read the context file**: `~/clawd/logs/sentry-webhooks/context_*.json`
-2. **Determine if auto-fixable**: See `skills/sentry-triage/SKILL.md`
-3. **Route to correct repo**: See `config/repositories.json`
+2. **Classify immediately** using the table above (no skill lookup needed)
+3. **Route to correct repo** using the Project Routing table above
 
 ### Auto-Fix Workflow
 ```bash
