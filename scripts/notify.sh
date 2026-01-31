@@ -63,6 +63,11 @@ if [[ -n "${DISCORD_WEBHOOK:-}" ]]; then
          "$DISCORD_WEBHOOK" > /dev/null 2>&1 || true
 fi
 
+# Clawdbot agent notification (if clawdbot is available)
+if command -v clawdbot &> /dev/null; then
+    clawdbot agent --message "$MESSAGE" --deliver 2>/dev/null || true
+fi
+
 # Pushover (for phone notifications, if configured)
 if [[ -n "${PUSHOVER_TOKEN:-}" ]] && [[ -n "${PUSHOVER_USER:-}" ]]; then
     # Priority based on severity

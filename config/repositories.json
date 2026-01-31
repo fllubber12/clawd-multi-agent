@@ -1,0 +1,61 @@
+{
+  "projects": {
+    "polymarket": {
+      "name": "Polymarket CopyTrader",
+      "path": "~/Projects/Polymarket_CopyTrader",
+      "github": "fllubber12/Copytrader",
+      "sentry_project": "polymarket-copytrader",
+      "language": "python",
+      "venv": ".venv",
+      "test_command": "python -m pytest tests/ -v",
+      "main_entry": "scripts/run_monitor.py",
+      "description": "Copy trading bot for Polymarket prediction markets"
+    },
+    "ygo": {
+      "name": "YGO Combo Pipeline",
+      "path": "~/Desktop/testing",
+      "github": "fllubber12/ygo-combo-pipeline",
+      "sentry_project": "ygo-combo-pipeline",
+      "language": "python",
+      "venv": ".venv",
+      "test_command": "python -m pytest tests/ -v",
+      "main_entry": "scripts/enumerate_all_paths.py",
+      "description": "Yu-Gi-Oh combo enumeration using CFFI bindings to ygopro-core"
+    },
+    "budget": {
+      "name": "Budget Pipeline",
+      "path": "~/Desktop/budget",
+      "github": null,
+      "sentry_project": "budget-pipeline",
+      "language": "python",
+      "venv": ".venv",
+      "test_command": "python -m pytest tests/ -v",
+      "main_entry": "main.py",
+      "description": "Transaction categorization for Credit Karma exports"
+    },
+    "kalshi": {
+      "name": "Kalshi Arbitrage",
+      "path": "~/Projects/Kalshi_Arbitrage",
+      "github": "fllubber12/Kalshi_Arbitrage",
+      "sentry_project": "kalshi-arbitrage",
+      "language": "python",
+      "venv": ".venv",
+      "test_command": "python -m pytest tests/ -v",
+      "main_entry": "src/phase2_watcher.py",
+      "description": "Cross-exchange arbitrage scanner for Polymarket/Kalshi"
+    },
+    "clawd": {
+      "name": "clawd",
+      "path": "~/clawd",
+      "github": "fllubber12/clawd-multi-agent",
+      "sentry_project": "clawd",
+      "language": "python",
+      "venv": ".venv",
+      "test_command": "python -m pytest tests/ -v",
+      "main_entry": "scripts/orchestrator.py",
+      "description": "Multi-agent autonomous coding system"
+    }
+  },
+  "sentry_webhook_port": 18790,
+  "default_branch": "main"
+}

@@ -106,6 +106,49 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
 
+## 🚨 Sentry Error Handling
+
+All 5 projects report errors to Sentry, which forwards to you via webhook:
+
+| Project | Path | Sentry DSN Suffix |
+|---------|------|-------------------|
+| polymarket | ~/Projects/Polymarket_CopyTrader | /4510801933762560 |
+| ygo | ~/Desktop/testing | /111 |
+| budget | ~/Desktop/budget | /222 |
+| kalshi | ~/Projects/Kalshi_Arbitrage | /333 |
+| clawd | ~/clawd | /444 |
+
+### When You Receive a Sentry Alert
+
+1. **Read the context file**: `~/clawd/logs/sentry-webhooks/context_*.json`
+2. **Determine if auto-fixable**: See `skills/sentry-triage/SKILL.md`
+3. **Route to correct repo**: See `config/repositories.json`
+
+### Auto-Fix Workflow
+```bash
+# 1. Create isolated worktree
+~/clawd/scripts/worktree-create.sh <project> sentry-fix-<id>
+
+# 2. Fix the error (in worktree)
+cd <worktree_path>
+# Apply fix...
+
+# 3. Run tests
+source .venv/bin/activate && python -m pytest tests/ -x
+
+# 4. Commit and cleanup
+git commit -m "fix: <error_type> in <file>"
+~/clawd/scripts/worktree-cleanup.sh <worktree_name>
+```
+
+### Escalation
+If error is NOT auto-fixable (security, architecture, business logic):
+```bash
+clawdbot gateway wake --text "⚠️ Sentry escalation: [summary]" --mode now
+```
+
+Log all Sentry actions to `~/clawd/logs/sentry-fixes/`.
+
 **🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
 
 **📝 Platform Formatting:**
