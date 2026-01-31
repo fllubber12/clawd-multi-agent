@@ -115,6 +115,48 @@ Route: brain
 Action: Read ~/Brain/overview.md
 ```
 
+### Example 4: What Should I Work On
+```
+Input: "What should I work on?"
+Route: brain
+Action: Read ~/Brain/overview.md, check "Current Focus" and "This Week's Goals"
+```
+
+### Example 5: Project Deep Dive
+```
+Input: "Tell me about the polymarket bot"
+Route: brain
+Action: Read ~/Brain/projects/polymarket-bot.md
+```
+
+## Brain Integration
+
+The Brain repo (`~/Brain`) is the central knowledge hub for all projects.
+
+### Brain Commands
+
+| User Says | Action |
+|-----------|--------|
+| "what should I work on" | Read `~/Brain/overview.md` → "Current Focus" + "This Week's Goals" |
+| "project status" | Summarize all `~/Brain/projects/*.md` |
+| "update brain" | Remind user to commit Brain changes |
+| "what's the priority" | Read `~/Brain/overview.md` → "Current Focus" |
+| "tell me about [project]" | Read `~/Brain/projects/[project].md` |
+
+### Brain File Mapping
+
+| Query Topic | Brain File |
+|-------------|------------|
+| Overall status | `~/Brain/overview.md` |
+| Polymarket bot | `~/Brain/projects/polymarket-bot.md` |
+| Yu-Gi-Oh engine | `~/Brain/projects/yugioh-engine.md` |
+| Budget pipeline | `~/Brain/projects/budget-pipeline.md` |
+| Kalshi arbitrage | `~/Brain/projects/kalshi-arbitrage.md` |
+| clawd system | `~/Brain/projects/clawd.md` |
+| Job search | `~/Brain/projects/job-search.md` |
+| Sentry pipeline | `~/Brain/infrastructure/sentry-pipeline.md` |
+| Decisions | `~/Brain/decisions/log.md` |
+
 ## Helper Functions
 
 ### Get Project Path
