@@ -433,7 +433,8 @@ def main():
     """Start the webhook server."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    server = HTTPServer(("0.0.0.0", WEBHOOK_PORT), SentryWebhookHandler)
+    # Bind to localhost only - ngrok handles external access
+    server = HTTPServer(("127.0.0.1", WEBHOOK_PORT), SentryWebhookHandler)
     print(f"🚀 Sentry webhook handler listening on port {WEBHOOK_PORT}")
     print(f"   Health check: http://localhost:{WEBHOOK_PORT}/")
     print(f"   Logs: {LOG_DIR}")
