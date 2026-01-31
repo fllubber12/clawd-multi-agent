@@ -25,3 +25,9 @@ Thumbs.db
 *.tmp
 *.bak
 logs/
+
+# Workspace symlinks (machine-specific)
+Brain
+Projects
+budget
+ygo
