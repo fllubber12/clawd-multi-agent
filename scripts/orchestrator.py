@@ -13,6 +13,10 @@ Environment:
     CLAWD_HOME - Clawd directory (default: ~/clawd)
 """
 
+# Initialize Sentry before other imports
+from sentry_config import init_sentry
+init_sentry()
+
 import json
 import subprocess
 import os
