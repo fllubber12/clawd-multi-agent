@@ -32,6 +32,9 @@
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>CLAWD_HOME</key>
         <string>/Users/zacharyhartley/clawd</string>
+        <!-- Get from: Sentry → Settings → Developer Settings → Your Integration → Client Secret -->
+        <key>SENTRY_CLIENT_SECRET</key>
+        <string>YOUR_SENTRY_CLIENT_SECRET_HERE</string>
     </dict>
 </dict>
 </plist>

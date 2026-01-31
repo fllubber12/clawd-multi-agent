@@ -13,6 +13,8 @@ Environment:
     CLAWD_HOME - Clawd directory (default: ~/clawd)
 """
 
+import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -26,6 +28,22 @@ from urllib.parse import parse_qs
 WEBHOOK_PORT = int(os.environ.get("WEBHOOK_PORT", 18790))
 CLAWD_HOME = Path(os.environ.get("CLAWD_HOME", Path.home() / "clawd"))
 LOG_DIR = CLAWD_HOME / "logs" / "sentry-webhooks"
+SENTRY_CLIENT_SECRET = os.environ.get("SENTRY_CLIENT_SECRET")
+
+
+def verify_signature(body: bytes, signature: str) -> bool:
+    """Verify Sentry webhook signature using HMAC-SHA256."""
+    if not SENTRY_CLIENT_SECRET:
+        print("[WARN] SENTRY_CLIENT_SECRET not set - skipping signature verification")
+        return True  # Allow if not configured (for backward compatibility)
+    if not signature:
+        return False
+    expected = hmac.new(
+        SENTRY_CLIENT_SECRET.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
 
 # Project mapping (Sentry project slug → local path)
 PROJECT_PATHS = {
@@ -341,6 +359,16 @@ class SentryWebhookHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
 
+            # Verify Sentry signature
+            signature = self.headers.get("Sentry-Hook-Signature", "")
+            if not verify_signature(body, signature):
+                print(f"[REJECT] Invalid signature from {self.client_address[0]}")
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Invalid signature"}).encode())
+                return
+
             # Parse JSON payload
             try:
                 payload = json.loads(body.decode("utf-8"))
@@ -348,7 +376,7 @@ class SentryWebhookHandler(BaseHTTPRequestHandler):
                 # Try form-encoded
                 payload = {"raw": body.decode("utf-8")}
 
-            print(f"\n[WEBHOOK] Received from Sentry")
+            print(f"\n[WEBHOOK] Received from Sentry (signature verified)")
 
             # Extract error context
             context = extract_error_context(payload)
